@@ -1,0 +1,49 @@
+import cv2
+import numpy as np
+import tensorflow as tf
+
+# Load pre-trained MobileNetSSD model
+model = tf.saved_model.load("ssd_mobilenet_v2_fpnlite_320x320/saved_model")
+
+# Load class labels
+class_names = {1: 'Person', 2: 'Bicycle', 3: 'Car', 4: 'Motorcycle'}
+
+# Open webcam
+cap = cv2.VideoCapture(0)
+
+while cap.isOpened():
+    ret, frame = cap.read()
+    if not ret:
+        break
+
+    # Convert frame to tensor
+    input_tensor = tf.convert_to_tensor(frame)
+    input_tensor = input_tensor[tf.newaxis, ...]
+
+    # Perform object detection
+    detections = model(input_tensor)
+
+    # Extract detection results
+    detection_scores = detections['detection_scores'][0].numpy()
+    detection_classes = detections['detection_classes'][0].numpy().astype(int)
+    detection_boxes = detections['detection_boxes'][0].numpy()
+
+    # Draw bounding boxes
+    h, w, _ = frame.shape
+    for i in range(len(detection_scores)):
+        if detection_scores[i] > 0.5:
+            box = detection_boxes[i] * np.array([h, w, h, w])
+            y_min, x_min, y_max, x_max = box.astype(int)
+
+            label = class_names.get(detection_classes[i], 'Unknown')
+            cv2.rectangle(frame, (x_min, y_min), (x_max, y_max), (0, 255, 0), 2)
+            cv2.putText(frame, label, (x_min, y_min - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
+    # Show output
+    cv2.imshow("Object Detection", frame)
+
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+cap.release()
+cv2.destroyAllWindows()
